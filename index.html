@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flappy Bird</title>
+    <title>Flappy Bird - 1000 Levels</title>
     <style>
         body {
             margin: 0;
@@ -44,16 +44,16 @@
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
 
-        #startScreen, #gameOverScreen {
+        #startScreen, #gameOverScreen, #levelCompleteScreen {
             text-align: center;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.8);
             padding: 30px;
             border-radius: 15px;
             pointer-events: auto;
         }
 
         h1 {
-            font-size: 3em;
+            font-size: 2.5em;
             margin: 0 0 20px 0;
             color: #FFD700;
         }
@@ -83,20 +83,43 @@
             box-shadow: 0 6px 12px rgba(0,0,0,0.3);
         }
 
-        #scoreDisplay {
+        #gameStats {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 24px;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
             font-weight: bold;
         }
 
-        #highScoreDisplay {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            font-size: 18px;
+        #levelInfo {
+            text-align: center;
             color: #FFD700;
+        }
+
+        #scoreInfo {
+            color: #00FF00;
+        }
+
+        #progressBar {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 20px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #progressFill {
+            height: 100%;
+            background: linear-gradient(90deg, #00FF00, #FFD700);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
         }
 
         .hidden {
@@ -104,9 +127,31 @@
         }
 
         .instructions {
-            font-size: 1.1em;
+            font-size: 1em;
             margin: 20px 0;
             opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .difficulty-indicator {
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            font-size: 14px;
+            color: #FF6B6B;
+        }
+
+        .level-complete-celebration {
+            color: #00FF00;
+            font-size: 1.3em;
+            margin: 15px 0;
+        }
+
+        .game-complete {
+            color: #FFD700;
+            font-size: 1.5em;
+            text-align: center;
+            margin: 20px 0;
         }
     </style>
 </head>
@@ -117,23 +162,53 @@
         <div id="ui">
             <div id="startScreen">
                 <h1>🐦 Flappy Bird</h1>
+                <h2 style="color: #00FF00;">1000 Levels Challenge!</h2>
                 <div class="instructions">
-                    Click or press SPACE to flap<br>
-                    Avoid the pipes!
+                    • Complete 10 points per level<br>
+                    • 1000 levels to master<br>
+                    • Difficulty increases every 10 levels<br><br>
+                    Click or press SPACE to flap
                 </div>
-                <button onclick="startGame()">Start Game</button>
+                <button onclick="startGame()">Start Level 1</button>
+            </div>
+
+            <div id="levelCompleteScreen" class="hidden">
+                <h2>Level Complete! 🎉</h2>
+                <div id="levelCompleteInfo"></div>
+                <div class="level-complete-celebration">+10 Points Earned!</div>
+                <button onclick="nextLevel()">Continue to Next Level</button>
             </div>
 
             <div id="gameOverScreen" class="hidden">
-                <h2>Game Over!</h2>
-                <div id="finalScore"></div>
-                <div id="newHighScore" class="hidden" style="color: #FFD700; font-size: 1.2em; margin: 10px 0;">🎉 New High Score! 🎉</div>
-                <button onclick="restartGame()">Play Again</button>
+                <h2>Level Failed!</h2>
+                <div id="failureInfo"></div>
+                <button onclick="retryLevel()">Retry Level</button>
+                <button onclick="restartFromLevel1()">Start from Level 1</button>
+            </div>
+
+            <div id="gameCompleteScreen" class="hidden">
+                <h1>🏆 CONGRATULATIONS! 🏆</h1>
+                <div class="game-complete">
+                    You've completed all 1000 levels!<br>
+                    You are a Flappy Bird Master!
+                </div>
+                <button onclick="restartFromLevel1()">Play Again</button>
             </div>
         </div>
 
-        <div id="scoreDisplay">Score: 0</div>
-        <div id="highScoreDisplay">Best: 0</div>
+        <div id="gameStats">
+            <div id="levelInfo">Level: 1</div>
+            <div id="scoreInfo">Score: 0/10</div>
+            <div>Best Level: <span id="bestLevel">1</span></div>
+        </div>
+
+        <div class="difficulty-indicator" id="difficultyInfo">
+            Difficulty: Easy
+        </div>
+
+        <div id="progressBar">
+            <div id="progressFill"></div>
+        </div>
     </div>
 
     <script>
@@ -141,9 +216,20 @@
         const ctx = canvas.getContext('2d');
 
         // Game variables
-        let gameState = 'start'; // 'start', 'playing', 'gameOver'
-        let score = 0;
-        let highScore = parseInt(localStorage.getItem('flappyBirdHighScore') || '0');
+        let gameState = 'start'; // 'start', 'playing', 'levelComplete', 'gameOver', 'gameComplete'
+        let currentLevel = parseInt(localStorage.getItem('flappyBirdCurrentLevel') || '1');
+        let bestLevel = parseInt(localStorage.getItem('flappyBirdBestLevel') || '1');
+        let levelScore = 0; // Score within current level (0-10)
+        let totalScore = (currentLevel - 1) * 10; // Total accumulated score
+
+        // Difficulty settings that change every 10 levels
+        let difficulty = {
+            gravity: 0.25,
+            pipeSpeed: 2,
+            pipeSpacing: 100, // frames between pipes
+            pipeGap: 180,
+            jumpPower: -8
+        };
 
         // Bird object
         const bird = {
@@ -152,67 +238,114 @@
             width: 30,
             height: 25,
             velocity: 0,
-            gravity: 0.3,
-            jumpPower: -10,
             color: '#FFD700'
         };
 
         // Pipes array
         let pipes = [];
         const pipeWidth = 60;
-        const pipeGap = 180;
         let pipeTimer = 0;
 
-        // Background
-        const bg = {
-            x1: 0,
-            x2: canvas.width,
-            speed: 2
-        };
+        // Update displays
+        updateLevelDisplay();
+        updateDifficultySettings();
 
-        // Update high score display
-        document.getElementById('highScoreDisplay').textContent = `Best: ${highScore}`;
+        function updateLevelDisplay() {
+            document.getElementById('levelInfo').textContent = `Level: ${currentLevel}`;
+            document.getElementById('scoreInfo').textContent = `Score: ${levelScore}/10`;
+            document.getElementById('bestLevel').textContent = bestLevel;
+            
+            // Update progress bar
+            const progress = (levelScore / 10) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+        }
+
+        function updateDifficultySettings() {
+            const difficultyLevel = Math.floor((currentLevel - 1) / 10);
+            
+            // Increase difficulty every 10 levels
+            difficulty.gravity = 0.25 + (difficultyLevel * 0.05);
+            difficulty.pipeSpeed = 2 + (difficultyLevel * 0.3);
+            difficulty.pipeSpacing = Math.max(70, 100 - (difficultyLevel * 3));
+            difficulty.pipeGap = Math.max(120, 180 - (difficultyLevel * 4));
+            difficulty.jumpPower = -8 - (difficultyLevel * 0.2);
+
+            // Update difficulty indicator
+            let difficultyName = 'Easy';
+            if (difficultyLevel >= 80) difficultyName = 'INSANE';
+            else if (difficultyLevel >= 60) difficultyName = 'EXTREME';
+            else if (difficultyLevel >= 40) difficultyName = 'VERY HARD';
+            else if (difficultyLevel >= 20) difficultyName = 'HARD';
+            else if (difficultyLevel >= 10) difficultyName = 'MEDIUM';
+            else if (difficultyLevel >= 5) difficultyName = 'NORMAL';
+
+            document.getElementById('difficultyInfo').textContent = `Difficulty: ${difficultyName}`;
+        }
 
         function startGame() {
             gameState = 'playing';
             document.getElementById('startScreen').classList.add('hidden');
-            resetGame();
+            resetLevel();
             gameLoop();
         }
 
-        function resetGame() {
+        function resetLevel() {
             bird.y = canvas.height / 2;
             bird.velocity = 0;
             pipes = [];
-            score = 0;
+            levelScore = 0;
             pipeTimer = 0;
-            updateScoreDisplay();
+            updateLevelDisplay();
         }
 
-        function restartGame() {
-            document.getElementById('gameOverScreen').classList.add('hidden');
-            document.getElementById('newHighScore').classList.add('hidden');
-            startGame();
-        }
-
-        function updateScoreDisplay() {
-            document.getElementById('scoreDisplay').textContent = `Score: ${score}`;
-        }
-
-        function updateHighScore() {
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('flappyBirdHighScore', highScore.toString());
-                document.getElementById('highScoreDisplay').textContent = `Best: ${highScore}`;
-                document.getElementById('newHighScore').classList.remove('hidden');
-                return true;
+        function nextLevel() {
+            if (currentLevel >= 1000) {
+                gameState = 'gameComplete';
+                document.getElementById('levelCompleteScreen').classList.add('hidden');
+                document.getElementById('gameCompleteScreen').classList.remove('hidden');
+                return;
             }
-            return false;
+
+            currentLevel++;
+            totalScore += 10;
+            
+            // Save progress
+            localStorage.setItem('flappyBirdCurrentLevel', currentLevel.toString());
+            if (currentLevel > bestLevel) {
+                bestLevel = currentLevel;
+                localStorage.setItem('flappyBirdBestLevel', bestLevel.toString());
+            }
+
+            updateDifficultySettings();
+            document.getElementById('levelCompleteScreen').classList.add('hidden');
+            gameState = 'playing';
+            resetLevel();
+            gameLoop();
+        }
+
+        function retryLevel() {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            gameState = 'playing';
+            resetLevel();
+            gameLoop();
+        }
+
+        function restartFromLevel1() {
+            currentLevel = 1;
+            totalScore = 0;
+            localStorage.setItem('flappyBirdCurrentLevel', '1');
+            updateDifficultySettings();
+            updateLevelDisplay();
+            
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('gameCompleteScreen').classList.add('hidden');
+            document.getElementById('startScreen').classList.remove('hidden');
+            gameState = 'start';
         }
 
         function jump() {
             if (gameState === 'playing') {
-                bird.velocity = bird.jumpPower;
+                bird.velocity = difficulty.jumpPower;
             }
         }
 
@@ -226,26 +359,26 @@
         });
 
         function updateBird() {
-            bird.velocity += bird.gravity;
+            bird.velocity += difficulty.gravity;
             bird.y += bird.velocity;
 
             // Prevent bird from going off screen
             if (bird.y < 0) bird.y = 0;
             if (bird.y + bird.height > canvas.height) {
-                gameOver();
+                levelFailed();
             }
         }
 
         function updatePipes() {
             // Add new pipes
             pipeTimer++;
-            if (pipeTimer > 90) { // Every 1.5 seconds at 60fps
-                const pipeHeight = Math.random() * (canvas.height - pipeGap - 100) + 50;
+            if (pipeTimer > difficulty.pipeSpacing) {
+                const pipeHeight = Math.random() * (canvas.height - difficulty.pipeGap - 100) + 50;
                 pipes.push({
                     x: canvas.width,
                     topHeight: pipeHeight,
-                    bottomY: pipeHeight + pipeGap,
-                    bottomHeight: canvas.height - (pipeHeight + pipeGap),
+                    bottomY: pipeHeight + difficulty.pipeGap,
+                    bottomHeight: canvas.height - (pipeHeight + difficulty.pipeGap),
                     passed: false
                 });
                 pipeTimer = 0;
@@ -253,7 +386,7 @@
 
             // Update pipe positions
             for (let i = pipes.length - 1; i >= 0; i--) {
-                pipes[i].x -= 3;
+                pipes[i].x -= difficulty.pipeSpeed;
 
                 // Remove pipes that are off screen
                 if (pipes[i].x + pipeWidth < 0) {
@@ -264,13 +397,18 @@
                 // Check for scoring
                 if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
                     pipes[i].passed = true;
-                    score++;
-                    updateScoreDisplay();
+                    levelScore++;
+                    updateLevelDisplay();
+
+                    // Check if level is complete
+                    if (levelScore >= 10) {
+                        levelComplete();
+                    }
                 }
 
                 // Check for collisions
                 if (checkCollision(bird, pipes[i])) {
-                    gameOver();
+                    levelFailed();
                 }
             }
         }
@@ -293,23 +431,31 @@
             return false;
         }
 
-        function gameOver() {
+        function levelComplete() {
+            gameState = 'levelComplete';
+            document.getElementById('levelCompleteInfo').innerHTML = 
+                `Level ${currentLevel} Complete!<br>Total Score: ${totalScore + 10}`;
+            document.getElementById('levelCompleteScreen').classList.remove('hidden');
+        }
+
+        function levelFailed() {
             gameState = 'gameOver';
-            updateHighScore();
-            document.getElementById('finalScore').textContent = `Final Score: ${score}`;
+            document.getElementById('failureInfo').innerHTML = 
+                `Level ${currentLevel} - Score: ${levelScore}/10<br>You need ${10 - levelScore} more points!`;
             document.getElementById('gameOverScreen').classList.remove('hidden');
         }
 
         function drawBackground() {
-            // Sky gradient
+            // Sky gradient that changes with level
+            const hue = (currentLevel * 2) % 360;
             const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#87CEEB');
-            gradient.addColorStop(1, '#98FB98');
+            gradient.addColorStop(0, `hsl(${hue}, 50%, 70%)`);
+            gradient.addColorStop(1, `hsl(${(hue + 30) % 360}, 60%, 75%)`);
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Simple cloud-like shapes
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
             ctx.beginPath();
             ctx.arc(100, 80, 30, 0, Math.PI * 2);
             ctx.arc(120, 80, 40, 0, Math.PI * 2);
@@ -331,8 +477,9 @@
             ctx.translate(bird.x + bird.width/2, bird.y + bird.height/2);
             ctx.rotate(rotation);
             
-            // Bird body
-            ctx.fillStyle = bird.color;
+            // Bird body - color changes with level
+            const birdHue = (currentLevel * 5) % 360;
+            ctx.fillStyle = `hsl(${birdHue}, 80%, 60%)`;
             ctx.fillRect(-bird.width/2, -bird.height/2, bird.width, bird.height);
             
             // Bird beak
@@ -349,8 +496,11 @@
         }
 
         function drawPipes() {
-            ctx.fillStyle = '#228B22';
-            ctx.strokeStyle = '#006400';
+            // Pipe color changes with difficulty
+            const difficultyLevel = Math.floor((currentLevel - 1) / 10);
+            const pipeHue = 120 - (difficultyLevel * 3); // Green to red
+            ctx.fillStyle = `hsl(${Math.max(0, pipeHue)}, 70%, 40%)`;
+            ctx.strokeStyle = `hsl(${Math.max(0, pipeHue)}, 70%, 30%)`;
             ctx.lineWidth = 2;
 
             pipes.forEach(pipe => {
@@ -363,12 +513,12 @@
                 ctx.strokeRect(pipe.x, pipe.bottomY, pipeWidth, pipe.bottomHeight);
 
                 // Pipe caps
-                ctx.fillStyle = '#32CD32';
+                ctx.fillStyle = `hsl(${Math.max(0, pipeHue)}, 70%, 50%)`;
                 ctx.fillRect(pipe.x - 5, pipe.topHeight - 20, pipeWidth + 10, 20);
                 ctx.fillRect(pipe.x - 5, pipe.bottomY, pipeWidth + 10, 20);
                 ctx.strokeRect(pipe.x - 5, pipe.topHeight - 20, pipeWidth + 10, 20);
                 ctx.strokeRect(pipe.x - 5, pipe.bottomY, pipeWidth + 10, 20);
-                ctx.fillStyle = '#228B22';
+                ctx.fillStyle = `hsl(${Math.max(0, pipeHue)}, 70%, 40%)`;
             });
         }
 
