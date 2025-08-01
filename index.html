@@ -582,4 +582,172 @@
             }
         });
 
-    
+        function updateBird() {
+            bird.velocity += difficulty.gravity;
+            bird.y += bird.velocity;
+            bird.rotation = Math.min(Math.max(bird.velocity * 0.08, -0.6), 0.6);
+
+            // Bird trail effect
+            bird.trail.push({x: bird.x + bird.width/2, y: bird.y + bird.height/2});
+            if (bird.trail.length > 8) bird.trail.shift();
+
+            if (bird.y < 0) bird.y = 0;
+            if (bird.y + bird.height > canvas.height) {
+                levelFailed();
+            }
+        }
+
+        function updatePipes() {
+            pipeTimer++;
+            if (pipeTimer > difficulty.pipeSpacing) {
+                const pipeHeight = Math.random() * (canvas.height - difficulty.pipeGap - 120) + 60;
+                pipes.push({
+                    x: canvas.width,
+                    topHeight: pipeHeight,
+                    bottomY: pipeHeight + difficulty.pipeGap,
+                    bottomHeight: canvas.height - (pipeHeight + difficulty.pipeGap),
+                    passed: false,
+                    glowIntensity: 0
+                });
+                pipeTimer = 0;
+            }
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= difficulty.pipeSpeed;
+
+                if (pipes[i].x + pipeWidth < 0) {
+                    pipes.splice(i, 1);
+                    continue;
+                }
+
+                if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+                    pipes[i].passed = true;
+                    pipes[i].glowIntensity = 1.0;
+                    levelScore++;
+                    updateLevelDisplay();
+                    createParticle(pipes[i].x + pipeWidth/2, canvas.height/2, 'score');
+
+                    if (levelScore >= 10) {
+                        levelComplete();
+                    }
+                }
+
+                if (pipes[i].glowIntensity > 0) {
+                    pipes[i].glowIntensity -= 0.02;
+                }
+
+                if (checkCollision(bird, pipes[i])) {
+                    levelFailed();
+                }
+            }
+        }
+
+        function checkCollision(bird, pipe) {
+            const birdLeft = bird.x + 2;
+            const birdRight = bird.x + bird.width - 2;
+            const birdTop = bird.y + 2;
+            const birdBottom = bird.y + bird.height - 2;
+
+            if (birdRight > pipe.x && birdLeft < pipe.x + pipeWidth) {
+                if (birdTop < pipe.topHeight || birdBottom > pipe.bottomY) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function levelComplete() {
+            gameState = 'levelComplete';
+            createParticle(canvas.width/2, canvas.height/2, 'level');
+            document.getElementById('levelCompleteInfo').innerHTML = 
+                `Level ${currentLevel} Mastered!<br><span style="color: #00ff88;">Total Score: ${totalScore + 10}</span>`;
+            document.getElementById('levelCompleteScreen').classList.remove('hidden');
+        }
+
+        function levelFailed() {
+            gameState = 'gameOver';
+            document.getElementById('failureInfo').innerHTML = 
+                `Level ${currentLevel} - Progress: ${levelScore}/10<br><span style="color: #ff6b6b;">Need ${10 - levelScore} more points!</span>`;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function drawBackground() {
+            // Dynamic sky gradient
+            const time = frameCount * 0.01;
+            const levelHue = (currentLevel * 2 + time * 10) % 360;
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, `hsl(${levelHue}, 60%, 75%)`);
+            gradient.addColorStop(0.7, `hsl(${(levelHue + 30) % 360}, 70%, 65%)`);
+            gradient.addColorStop(1, `hsl(${(levelHue + 60) % 360}, 80%, 55%)`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Animated stars
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            stars.forEach(star => {
+                star.twinkle += 0.1;
+                const opacity = (Math.sin(star.twinkle) + 1) * 0.5;
+                ctx.globalAlpha = opacity * 0.6;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            });
+            ctx.globalAlpha = 1;
+
+            // Animated clouds
+            clouds.forEach(cloud => {
+                cloud.x -= cloud.speed;
+                if (cloud.x < -cloud.size) cloud.x = canvas.width + cloud.size;
+
+                const cloudGradient = ctx.createRadialGradient(
+                    cloud.x, cloud.y, 0,
+                    cloud.x, cloud.y, cloud.size
+                );
+                cloudGradient.addColorStop(0, `rgba(255, 255, 255, ${cloud.opacity})`);
+                cloudGradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
+                
+                ctx.fillStyle = cloudGradient;
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.size, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.size * 0.5, cloud.y, cloud.size * 0.8, 0, Math.PI * 2);
+                ctx.arc(cloud.x - cloud.size * 0.5, cloud.y, cloud.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawBird() {
+            ctx.save();
+            
+            // Bird trail
+            if (bird.trail.length > 1) {
+                ctx.strokeStyle = `rgba(255, 215, 0, 0.3)`;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(bird.trail[0].x, bird.trail[0].y);
+                for (let i = 1; i < bird.trail.length; i++) {
+                    ctx.lineTo(bird.trail[i].x, bird.trail[i].y);
+                }
+                ctx.stroke();
+            }
+
+            ctx.translate(bird.x + bird.width/2, bird.y + bird.height/2);
+            ctx.rotate(bird.rotation);
+            
+            // Bird glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = `hsl(${(frameCount * 2) % 360}, 80%, 60%)`;
+            
+            // Bird body with gradient
+            const birdGradient = ctx.createLinearGradient(-bird.width/2, -bird.height/2, bird.width/2, bird.height/2);
+            birdGradient.addColorStop(0, `hsl(${(currentLevel * 5 + frameCount) % 360}, 90%, 70%)`);
+            birdGradient.addColorStop(1, `hsl(${(currentLevel * 5 + frameCount + 60) % 360}, 90%, 60%)`);
+            ctx.fillStyle = birdGradient;
+            
+            // Bird shape
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bird.width/2, bird.height/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Wing animation
+            const wingFlap = Math.sin(frameCount * 0.3) * 0.3;
+            ctx.fillStyle = `hsl(${(currentLevel * 5 + frameCount + 120) % 360}, 80%,
