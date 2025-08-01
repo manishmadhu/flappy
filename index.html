@@ -902,24 +902,26 @@
         }
 
         // Enhanced roundRect function for better pipe appearance
-        CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radii) {
-            if (!radii) radii = [0, 0, 0, 0];
-            if (typeof radii === 'number') radii = [radii, radii, radii, radii];
-            
-            this.beginPath();
-            this.moveTo(x + radii[0], y);
-            this.lineTo(x + width - radii[1], y);
-            this.quadraticCurveTo(x + width, y, x + width, y + radii[1]);
-            this.lineTo(x + width, y + height - radii[2]);
-            this.quadraticCurveTo(x + width, y + height, x + width - radii[2], y + height);
-            this.lineTo(x + radii[3], y + height);
-            this.quadraticCurveTo(x, y + height, x, y + height - radii[3]);
-            this.lineTo(x, y + radii[0]);
-            this.quadraticCurveTo(x, y, x + radii[0], y);
-            this.closePath();
-        };
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radii) {
+                if (!radii) radii = [0, 0, 0, 0];
+                if (typeof radii === 'number') radii = [radii, radii, radii, radii];
+                
+                this.beginPath();
+                this.moveTo(x + radii[0], y);
+                this.lineTo(x + width - radii[1], y);
+                this.quadraticCurveTo(x + width, y, x + width, y + radii[1]);
+                this.lineTo(x + width, y + height - radii[2]);
+                this.quadraticCurveTo(x + width, y + height, x + width - radii[2], y + height);
+                this.lineTo(x + radii[3], y + height);
+                this.quadraticCurveTo(x, y + height, x, y + height - radii[3]);
+                this.lineTo(x, y + radii[0]);
+                this.quadraticCurveTo(x, y, x + radii[0], y);
+                this.closePath();
+            };
+        }
 
-        // Initial render
+        // Initialize the game
         render();
     </script>
 </body>
