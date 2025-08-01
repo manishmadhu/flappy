@@ -750,4 +750,177 @@
             
             // Wing animation
             const wingFlap = Math.sin(frameCount * 0.3) * 0.3;
-            ctx.fillStyle = `hsl(${(currentLevel * 5 + frameCount + 120) % 360}, 80%,
+            ctx.fillStyle = `hsl(${(currentLevel * 5 + frameCount + 120) % 360}, 80%, 50%)`;
+            ctx.beginPath();
+            ctx.ellipse(-bird.width/4, -bird.height/4 + wingFlap, bird.width/3, bird.height/4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Bird beak with gradient
+            const beakGradient = ctx.createLinearGradient(bird.width/2 - 8, -4, bird.width/2 + 8, 4);
+            beakGradient.addColorStop(0, '#FFA500');
+            beakGradient.addColorStop(1, '#FF6347');
+            ctx.fillStyle = beakGradient;
+            ctx.beginPath();
+            ctx.moveTo(bird.width/2 - 2, -4);
+            ctx.lineTo(bird.width/2 + 10, 0);
+            ctx.lineTo(bird.width/2 - 2, 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Bird eye with animation
+            const eyeSize = 6 + Math.sin(frameCount * 0.1) * 0.5;
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(-bird.width/6, -bird.height/6, eyeSize, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#FFF';
+            ctx.beginPath();
+            ctx.arc(-bird.width/6 + 1, -bird.height/6 - 1, eyeSize/2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function drawPipes() {
+            pipes.forEach((pipe, index) => {
+                // Pipe color gradient based on difficulty and glow
+                const difficultyLevel = Math.floor((currentLevel - 1) / 10);
+                const hue = Math.max(0, 120 - (difficultyLevel * 3));
+                const glowIntensity = pipe.glowIntensity || 0;
+                
+                // Pipe glow effect
+                if (glowIntensity > 0) {
+                    ctx.shadowBlur = 20 * glowIntensity;
+                    ctx.shadowColor = '#FFD700';
+                } else {
+                    ctx.shadowBlur = 5;
+                    ctx.shadowColor = `hsla(${hue}, 70%, 30%, 0.5)`;
+                }
+
+                // Top pipe gradient
+                const topGradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
+                topGradient.addColorStop(0, `hsl(${hue}, 70%, 45%)`);
+                topGradient.addColorStop(0.5, `hsl(${hue}, 70%, 55%)`);
+                topGradient.addColorStop(1, `hsl(${hue}, 70%, 35%)`);
+                ctx.fillStyle = topGradient;
+                
+                // Top pipe with rounded edges
+                ctx.beginPath();
+                ctx.roundRect(pipe.x, 0, pipeWidth, pipe.topHeight, [0, 0, 8, 8]);
+                ctx.fill();
+                ctx.strokeStyle = `hsl(${hue}, 70%, 25%)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Bottom pipe gradient
+                const bottomGradient = ctx.createLinearGradient(pipe.x, pipe.bottomY, pipe.x + pipeWidth, pipe.bottomY + pipe.bottomHeight);
+                bottomGradient.addColorStop(0, `hsl(${hue}, 70%, 45%)`);
+                bottomGradient.addColorStop(0.5, `hsl(${hue}, 70%, 55%)`);
+                bottomGradient.addColorStop(1, `hsl(${hue}, 70%, 35%)`);
+                ctx.fillStyle = bottomGradient;
+                
+                // Bottom pipe with rounded edges
+                ctx.beginPath();
+                ctx.roundRect(pipe.x, pipe.bottomY, pipeWidth, pipe.bottomHeight, [8, 8, 0, 0]);
+                ctx.fill();
+                ctx.stroke();
+
+                // Pipe caps with enhanced 3D effect
+                const capGradient = ctx.createLinearGradient(pipe.x - 8, 0, pipe.x + pipeWidth + 8, 0);
+                capGradient.addColorStop(0, `hsl(${hue}, 70%, 60%)`);
+                capGradient.addColorStop(0.5, `hsl(${hue}, 70%, 70%)`);
+                capGradient.addColorStop(1, `hsl(${hue}, 70%, 50%)`);
+                ctx.fillStyle = capGradient;
+                
+                // Top pipe cap
+                ctx.beginPath();
+                ctx.roundRect(pipe.x - 8, pipe.topHeight - 25, pipeWidth + 16, 25, [0, 0, 12, 12]);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Bottom pipe cap
+                ctx.beginPath();
+                ctx.roundRect(pipe.x - 8, pipe.bottomY, pipeWidth + 16, 25, [12, 12, 0, 0]);
+                ctx.fill();
+                ctx.stroke();
+
+                // Pipe highlights
+                ctx.strokeStyle = `hsla(${hue}, 70%, 80%, 0.8)`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(pipe.x + 5, 5);
+                ctx.lineTo(pipe.x + 5, pipe.topHeight - 30);
+                ctx.moveTo(pipe.x + 5, pipe.bottomY + 30);
+                ctx.lineTo(pipe.x + 5, pipe.bottomY + pipe.bottomHeight - 5);
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function drawUI() {
+            // Level progress visualization
+            const progressWidth = canvas.width * 0.8;
+            const progressX = (canvas.width - progressWidth) / 2;
+            const progressY = 30;
+            
+            // Progress background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fillRect(progressX, progressY, progressWidth, 8);
+            
+            // Progress fill
+            const progressFill = (levelScore / 10) * progressWidth;
+            const progressGradient = ctx.createLinearGradient(progressX, 0, progressX + progressWidth, 0);
+            progressGradient.addColorStop(0, '#00ff88');
+            progressGradient.addColorStop(1, '#FFD700');
+            ctx.fillStyle = progressGradient;
+            ctx.fillRect(progressX, progressY, progressFill, 8);
+        }
+
+        function render() {
+            frameCount++;
+            drawBackground();
+            drawPipes();
+            drawBird();
+            drawUI();
+            updateParticles();
+            drawParticles();
+        }
+
+        function gameLoop() {
+            if (gameState === 'playing') {
+                updateBird();
+                updatePipes();
+            }
+            
+            render();
+
+            if (gameState === 'playing') {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Enhanced roundRect function for better pipe appearance
+        CanvasRenderingContext2D.prototype.roundRect = function(x, y, width, height, radii) {
+            if (!radii) radii = [0, 0, 0, 0];
+            if (typeof radii === 'number') radii = [radii, radii, radii, radii];
+            
+            this.beginPath();
+            this.moveTo(x + radii[0], y);
+            this.lineTo(x + width - radii[1], y);
+            this.quadraticCurveTo(x + width, y, x + width, y + radii[1]);
+            this.lineTo(x + width, y + height - radii[2]);
+            this.quadraticCurveTo(x + width, y + height, x + width - radii[2], y + height);
+            this.lineTo(x + radii[3], y + height);
+            this.quadraticCurveTo(x, y + height, x, y + height - radii[3]);
+            this.lineTo(x, y + radii[0]);
+            this.quadraticCurveTo(x, y, x + radii[0], y);
+            this.closePath();
+        };
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
